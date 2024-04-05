@@ -63,12 +63,11 @@ void cuda_diffusion(float* u, float *u_new, const unsigned int n){
   int i = NG + threadIdx.x;
 
   //Do the diffusion  
-  u_new[i] = u[i] + dt/(dx*dx) *(
-                  - 1./12.f* u[i-2]
-                  + 4./3.f * u[i-1]
-                  - 5./2.f * u[i]
-                  + 4./3.f * u[i+1]
-                  - 1./12.f* u[i+2]);
+  u_new[i] = u[i] - c_a * u[i-2]
+                  + c_b * u[i-1]
+                  - c_c * u[i]
+                  + c_b * u[i+1]
+                  - c_c * u[i+2];
 
   //Apply the dirichlet boundary conditions
   //HINT: Think about which threads will have the data for the boundaries
@@ -76,15 +75,15 @@ void cuda_diffusion(float* u, float *u_new, const unsigned int n){
   {
     u_new[1] = -u_new[NG];
   }  
-  else if (threadIdx.x == 1)
+  if (threadIdx.x == 1)
   {
     u_new[0] = -u_new[NG + 1];
   }
-  else if (threadIdx.x == n - 2)
+  if (threadIdx.x == n - 2)
   {
     u_new[n - NG + 1] = -u_new[n - NG - 2];
   } 
-  else if (threadIdx.x == n - 1)
+  if (threadIdx.x == n - 1)
   {
     u_new[n - NG] = -u_new[n - NG - 1];
   }
@@ -161,7 +160,9 @@ int main(int argc, char** argv){
   float const_c = 5.f/2.f  * dt/(dx*dx);
 
   //Copy these the cuda constant memory
-  //FIXME
+  cudaMemcpyToSymbol(&c_a, &const_a, sizeof(float), 0, cudaMemcpyHostToDevice);
+  cudaMemcpyToSymbol(&c_b, &const_b, sizeof(float), 0, cudaMemcpyHostToDevice);
+  cudaMemcpyToSymbol(&c_c, &const_c, sizeof(float), 0, cudaMemcpyHostToDevice);
 
   //iterator, for later
   int i;
@@ -246,7 +247,9 @@ int main(int argc, char** argv){
 
   //Allocate memory on the GPU
   float* d_u, *d_u2;
-  //FIXME Allocate d_u,d_u2 on the GPU, and copy cuda_u into d_u
+  cudaMalloc(&d_u, sizeof(float) * n);
+  cudaMalloc(&d_u2, sizeof(float) * n);
+  cudaMemcpyToSymbol(d_u, cuda_u, sizeof(float) * n, 0, cudaMemcpyHostToDevice);
 
 	cudaEventRecord(start);//Start timing
   //Perform n_steps of diffusion
@@ -255,16 +258,16 @@ int main(int argc, char** argv){
     if(outputData && i%outputPeriod == 0){
       //Copy data off the device for writing
       sprintf(filename,"data/cuda_u%08d.dat",i);
-      //FIXME
+      cudaMemcpyToSymbol(cuda_u, d_u, sizeof(float) * n, 0, cudaMemcpyDeviceToHost);
 			
       outputToFile(filename,cuda_u,n);
     }
 
     //Call the cuda_diffusion kernel
-    //FIXME
+    cuda_diffusion<<<1,n-NG>>>(d_u, d_u2, n);
 
     //Switch the buffer with the original u
-    //FIXME
+    cudaMemcpyToSymbol(d_u, d_u2, sizeof(float) * n, 0, cudaMemcpyDeviceToDevice);
 
   }
 	cudaEventRecord(stop);//End timing
@@ -272,7 +275,7 @@ int main(int argc, char** argv){
 
   //Copy the memory back for one last data dump
   sprintf(filename,"data/cuda_u%08d.dat",i);
-  //FIXME
+  cudaMemcpyToSymbol(cuda_u, d_u, sizeof(float) * n, 0, cudaMemcpyDeviceToHost);
   
   outputToFile(filename,cuda_u,n);
 
