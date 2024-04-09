@@ -60,7 +60,7 @@ void host_diffusion(float* u, float *u_new, const unsigned int n,
 __global__ 
 void cuda_diffusion(float* u, float *u_new, const unsigned int n){
 
-  int i = NG + threadIdx.x;
+  int i = blockIdx.x * blockDim.x + threadIdx.x + 2;
 
   //Do the diffusion  
   u_new[i] = u[i] - c_a * u[i-2]
@@ -264,7 +264,7 @@ int main(int argc, char** argv){
     }
 
     //Call the cuda_diffusion kernel
-    cuda_diffusion<<<1,n-NG>>>(d_u, d_u2, n);
+    cuda_diffusion<<<gridDim,blockDim>>>(d_u, d_u2, n);
 
     //Switch the buffer with the original u
     cudaMemcpyToSymbol(d_u, d_u2, sizeof(float) * n, 0, cudaMemcpyDeviceToDevice);
