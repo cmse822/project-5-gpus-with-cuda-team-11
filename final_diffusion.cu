@@ -119,43 +119,40 @@ void shared_diffusion(float* u, float *u_new, const unsigned int n)
     //Allocate the shared memory
 
 
-    __shared__ float s_u[BLOCK_DIM_X + 4];
+    __shared__ float shared_m[BLOCK_DIM_X + 4];
 
-    // Local index for shared memory
-    int si = threadIdx.x + 2;
+    // local index for shared memory
+    int s_index_ = threadIdx.x + 2;
 
     // global index of thread 
-    int gi = blockIdx.x*blockDim.x + si;
+    int g_index_ = blockIdx.x*blockDim.x + s_index_;
 
-
-
-    // Fill each local element with its corresponding global element
-    s_u[si] = u[gi];
+    shared_m[s_index_] = u[g_index_];
 
     if(si < 4)
     {
-         s_u[si - 2] = u[gi - 2];
+         shared_m[s_index_ - 2] = u[g_index_ - 2];
     }
-    else if(si >= blockDim.x - 4)
+    else if(s_index_ >= blockDim.x - 4)
     {
-       s_u[si + 2] = u[gi + 2];
+       shared_m[s_index_ + 2] = u[g_index_ + 2];
     }
     __syncthreads();
 
-    u_new[gi] = s_u[si] + ( c_a*s_u[si-2]
-                          + c_b*s_u[si-1]
-                          + c_c*s_u[si]
-                          + c_b*s_u[si+1]
-                          + c_a*s_u[si+2]);
+    u_new[g_index_] = shared_m[s_index_] + ( c_a*shared_m[s_index_-2]
+                          + c_b*shared_m[s_index_-1]
+                          + c_c*shared_m[s_index_]
+                          + c_b*shared_m[s_index_+1]
+                          + c_a*shared_m[s_index_+2]);
 
     //Apply the dirichlet boundary conditions
-    if(gi < 4)
+    if(g_index_ < 4)
      {
-        u_new[(gi + 1)%2] = -u_new[gi];
+        u_new[(g_index_ + 1)%2] = -u_new[g_index_];
      }
-    if(gi >= n - 4)
+    if(g_index_ >= n - 4)
     {
-     u_new[2*(n - 2)-(gi + 1)] = -u_new[gi];
+     u_new[2*(n - 2)-(g_index_ + 1)] = -u_new[g_index_];
     }
 
 }
