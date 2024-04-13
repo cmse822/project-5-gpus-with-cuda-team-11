@@ -2,6 +2,15 @@
 
 -> Job script: job_.sb
 
+-> Compilation and running within job script:
+
+  - module load NVHPC/21.9-GCCcore-10.3.0-CUDA-11.4
+
+  - nvcc final_diffusion_code.cu -o final_diffusion -O3
+
+  - ./final_diffusion.c
+
+
 -> The experiment below makes use of:
   - number of ghost cells = NG = 2 
   - number of points = (2^20 + 2*NG)
@@ -9,6 +18,9 @@
   - No output to files
   - Block Dimensions -- Threads per block = 128 , 256 , 512, and 1024
   - Grid Size -- Number of Blocks = (number of points - 2*NG) / (Threads per Block) = (2^20)/(Threads per Block)
+
+
+
 
 1.)
 
