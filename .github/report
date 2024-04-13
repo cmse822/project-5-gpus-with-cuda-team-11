@@ -1,0 +1,90 @@
+-> Code: final_diffusion.cu
+
+-> Job script: job_.sb
+
+-> The experiment below makes use of:
+  - number of ghost cells = NG = 2 
+  - number of points = (2^20 + 2*NG)
+  - time steps = 100
+  - No output to files
+  - Block Dimensions -- Threads per block = 128 , 256 , 512, and 1024
+  - Grid Size -- Number of Blocks = (number of points - 2*NG) / (Threads per Block) = (2^20)/(Threads per Block)
+
+1.)
+
+-> CPU implementation:
+
+- Host: 1.713 ms per step
+___________________________________________________________________________
+
+Block Dimensions = 128
+
+- Naive Cuda Using Global Device Memory: 0.0166 ms per step
+
+- Cuda using Shared Memory:  0.0168 ms per step
+
+- Cuda using Excessive Memory Copy (Host-Device-Host): 1.5600 ms per step
+
+___________________________________________________________________________
+
+-> GPU implementation:
+
+Block Dimensions = 256
+
+- Naive Cuda Using Global Device Memory: 0.0121 ms per step
+
+- Cuda using Shared Memory:  0.0128 ms per step
+
+- Cuda using Excessive Memory Copy (Host-Device-Host):  1.5542 ms per step
+
+___________________________________________________________________________
+-> GPU implementation:
+
+Block Dimensions = 512
+
+- Naive Cuda Using Global Device Memory: 0.0122 ms per step
+
+- Cuda using Shared Memory:  0.0132 ms per step
+
+- Cuda using Excessive Memory Copy (Host-Device-Host):  1.5393 ms per step
+___________________________________________________________________________
+-> GPU implementation:
+
+Block Dimensions = 1024
+
+- Naive Cuda Using Global Device Memory: 0.0128 ms per step
+
+- Cuda using Shared Memory: 0.0144 ms per step
+
+- Cuda using Excessive Memory Copy (Host-Device-Host): 1.6287 ms per step
+___________________________________________________________________________
+
+
+2.)
+Compared to the single threaded host code, the gpu implementation is 100 times faster (offers speedup=100). Assuming we use
+all the cores to parallelize the host implementation and assuming that we are able to reach the theoritical performance of 30.7 GFLOP/s
+for every core out of the 100 cores(without any i/o or memory bottlenecks) then the host implementation can maybe get over 100*30=3000 
+GFLOP/s but modern GPUs like the NVIDIA V100 GPU can perform around 6,000 GFLOP/s so it's unlikely that the host implementation can improve
+upon that. 
+
+3.)
+The excessive memcpy case is the slowest (its running time is approximately equal to the host implementation's running time).
+This is because of the back and forth transferring of the solution from host to device across time steps. This shows us that
+transferring data from device to host and vice-versa is very expensive and can be a potential bottleneck similar to how 
+network communication between nodes doing work can become a potential bottleneck. To tackle that, one has to minimize transferring
+of data by only transferring data at synchronization points. For example, in our code we only need to transfer data at the beginning 
+and at the end after all time steps since there are no synchronization points or depedencies. In other scenarios where multiple gpus 
+are doing work, one can utilize fast communication hardware lines between gpus for synchronization to address this bottleneck of moving
+data from host RAM to gpu memory and vice-versa. Moreover, returning data of much smaller size to the host relative to the data size 
+transferred from host to device is another approach that would help (works well along with fast hardware communication lines between
+multiple gpus for synchronization assuming multiple gpus are being used).
+
+4.)
+
+By increasing the block dimension, we observed a minor decrease in performance (running time increase) for both of the global and shared
+memory implementations. In the specific case of a shared memory implementation where the assumption is that multiple blocks can run on a 
+single multiprocessor thus having shared memory,
+
+
+increasing the block dimension means having more threads per
+block
